@@ -1,0 +1,13 @@
+# Backup files
+*.backup
+*.bak
+*.bak-*
+
+# macOS
+.DS_Store
+
+# Cache
+cache/
+
+# Logs
+*.log
