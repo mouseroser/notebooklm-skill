@@ -1,0 +1,19 @@
+{
+  "notebooks": {
+    "memory": {
+      "id": "426445ec-1a7f-4700-a7e7-4ffd0fa91a97",
+      "description": "Agent shared memory and context",
+      "added": "2026-02-28T16:19:38Z"
+    },
+    "media-research": {
+      "id": "636b77c6-3549-48e7-9b64-9d5c07afe554",
+      "description": "Wemedia content research sources",
+      "added": "2026-02-28T16:19:38Z"
+    },
+    "openclaw-docs": {
+      "id": "98473fd7-a7c1-4557-bf3d-15a5e37b17cd",
+      "description": "OpenClaw documentation and architecture",
+      "added": "2026-02-28T16:19:38Z"
+    }
+  }
+}

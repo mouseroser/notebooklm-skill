@@ -76,27 +76,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-parse_note_get_output() {
-  local raw="$1"
-
-  python3 - "$raw" <<'PY2'
-import json
-import sys
-
-raw = sys.argv[1]
-lines = raw.splitlines()
-if len(lines) < 3 or not lines[0].startswith('ID: ') or not lines[1].startswith('Title: ') or lines[2] != 'Content:':
-    sys.exit(1)
-
-print(json.dumps({
-    'id': lines[0][4:].strip(),
-    'title': lines[1][7:].strip(),
-    'content': '\\n'.join(lines[3:]),
-    'raw': raw,
-}, ensure_ascii=True))
-PY2
-}
-
 # --- Command: query ---
 
 cmd_query() {
@@ -174,218 +153,11 @@ cmd_query() {
     return 1
   fi
 
-  # Extract JSON from output (skip WARNING/INFO lines)
-  local json_output
-  json_output=$(echo "$output" | grep -v "WARNING\|INFO\|DEBUG" | jq -c '.')
-  if [[ -z "$json_output" ]]; then
-    audit_log "$agent_id" "$notebook" "query" "error" "$(( SECONDS - _start_ts ))" "no_json_output"
-    json_error "parse_error" "Failed to extract JSON from CLI output" "$output"
-    return 1
-  fi
-
   # Cache result
-  cache_set "query" "$cache_key" "$json_output" >/dev/null 2>&1
+  cache_set "query" "$cache_key" "$output" >/dev/null 2>&1
 
   audit_log "$agent_id" "$notebook" "query" "ok" "$(( SECONDS - _start_ts ))"
-  printf '%s\n' "$json_output" | jq -c '{ok:true,cached:false,data:.}'
-  return 0
-}
-
-# --- Command: note ---
-
-cmd_note() {
-  local agent_id="$1" subcmd="$2" notebook="$3" note_id="$4"
-
-  case "$subcmd" in
-    convert-to-source)
-      cmd_note_convert_to_source "$agent_id" "$notebook" "$note_id"
-      ;;
-    *)
-      json_error "invalid_args" "Unknown note subcommand: $subcmd" "Valid: convert-to-source"
-      return 1
-      ;;
-  esac
-}
-
-cmd_note_convert_to_source() {
-  local agent_id="$1" notebook="$2" note_id="$3"
-  local _start_ts=$SECONDS
-  local lock_acquired=0
-
-  # Keep the lock release visible near the top of the function and guarantee cleanup on every exit path.
-  trap 'if [[ "${lock_acquired:-0}" -eq 1 ]]; then release_lock >/dev/null 2>&1 || true; fi' RETURN
-
-  if [[ -z "$notebook" || -z "$note_id" ]]; then
-    json_error "invalid_args" "notebook and note_id required"
-    return 1
-  fi
-
-  local acl_result
-  acl_result=$(check_acl "$agent_id" "$notebook" "note-convert-to-source")
-  if [[ $(echo "$acl_result" | jq -r '.allowed') != "true" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "denied" "$(( SECONDS - _start_ts ))" "acl_denied"
-    echo "$acl_result"
-    return 1
-  fi
-
-  local rate_result
-  rate_result=$(rate_check "$agent_id")
-  if [[ $(echo "$rate_result" | jq -r '.ok') != "true" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "rate_limited" "$(( SECONDS - _start_ts ))" "rate_limited"
-    echo "$rate_result"
-    return 1
-  fi
-
-  local nb_entry nb_id
-  nb_entry=$(registry_get "$notebook")
-  if [[ $(echo "$nb_entry" | jq -r '.ok') != "true" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "notebook_not_found"
-    echo "$nb_entry"
-    return 1
-  fi
-  nb_id=$(echo "$nb_entry" | jq -r '.notebook.id')
-
-  local lock_result
-  lock_result=$(acquire_lock "$LOCK_TIMEOUT")
-  if [[ $(echo "$lock_result" | jq -r '.ok') != "true" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "lock_timeout"
-    echo "$lock_result"
-    return 1
-  fi
-  lock_acquired=1
-
-  local note_output note_exit note_json note_title note_content note_content_bytes
-  local note_verify_output note_verify_exit note_verify_json note_verify_content
-  local source_list_output source_list_exit source_count
-  note_output=$(retry_cli "note-get" notebooklm note get -n "$nb_id" "$note_id" 2>&1)
-  note_exit=$?
-
-  if [[ $note_exit -ne 0 ]]; then
-    local safe_output
-    safe_output=$(echo "$note_output" | head -5 | tr '
-' ' ')
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "note_not_found"
-    json_error "note_not_found" "note get failed" "$safe_output"
-    return 1
-  fi
-
-  source_list_output=$(retry_cli "source-list" notebooklm source list -n "$nb_id" 2>&1)
-  source_list_exit=$?
-  if [[ $source_list_exit -ne 0 ]]; then
-    local safe_output
-    safe_output=$(echo "$source_list_output" | head -5 | tr '
-' ' ')
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "source_list_failed"
-    json_error "source_list_failed" "source list failed" "$safe_output"
-    return 1
-  fi
-
-  source_count=$(SOURCE_LIST_RAW="$source_list_output" python3 - <<'PY2'
-import json
-import os
-import re
-import sys
-
-raw = os.environ.get('SOURCE_LIST_RAW', '')
-count = None
-try:
-    data = json.loads(raw)
-    if isinstance(data, list):
-        count = len(data)
-    elif isinstance(data, dict):
-        for key in ('sources', 'data', 'items'):
-            value = data.get(key)
-            if isinstance(value, list):
-                count = len(value)
-                break
-        if count is None and isinstance(data.get('count'), int):
-            count = data['count']
-except Exception:
-    pass
-
-if count is None:
-    ids = [line for line in raw.splitlines() if re.match(r'^ID:\s+', line)]
-    count = len(ids)
-
-print(count)
-PY2
-)
-  if [[ "$source_count" =~ ^[0-9]+$ ]] && (( source_count >= 50 )); then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "quota_exceeded"
-    jq -n -c '{ok:false,error:"quota_exceeded",message:"Source quota exceeded (50/50)"}'
-    return 1
-  fi
-
-  note_json=$(parse_note_get_output "$note_output")
-  if [[ -z "$note_json" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "note_parse_failed"
-    json_error "note_not_found" "Unable to parse note content" "Unexpected note get output"
-    return 1
-  fi
-
-  note_title=$(echo "$note_json" | jq -r --arg fallback "Converted Note ${note_id}" 'if (.title // "") == "" then $fallback else .title end')
-  note_content=$(echo "$note_json" | jq -r '.content // ""')
-  if [[ -z "$note_content" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "note_empty"
-    json_error "invalid_args" "Note content is empty" "$note_id"
-    return 1
-  fi
-
-  note_content_bytes=$(printf '%s' "$note_content" | wc -c | awk '{print $1}')
-  if (( note_content_bytes > 102400 )); then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "content_too_large"
-    jq -n -c '{ok:false,error:"content_too_large",message:"Note content exceeds 100KB limit"}'
-    return 1
-  fi
-
-  # Round-trip through jq so multiline content stays JSON-safe before passing to the CLI.
-  local source_title_arg source_content_arg source_output source_exit
-  source_title_arg=$(printf '%s' "$note_title" | jq -Rs . | jq -r .)
-  source_content_arg=$(printf '%s' "$note_content" | jq -Rs . | jq -r .)
-  source_output=$(retry_cli "source-add" notebooklm source add -n "$nb_id" --title "$source_title_arg" --json "$source_content_arg" 2>&1)
-  source_exit=$?
-
-  release_lock >/dev/null 2>&1
-  lock_acquired=0
-
-  if [[ $source_exit -ne 0 ]]; then
-    local safe_output
-    safe_output=$(echo "$source_output" | head -5 | tr '
-' ' ')
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "source_add_failed"
-    json_error "source_add_failed" "source add failed" "$safe_output"
-    return 1
-  fi
-
-  local source_id
-  source_id=$(printf '%s
-' "$source_output" | jq -r '.source.id // .source_id // .id // empty' 2>/dev/null)
-  if [[ -z "$source_id" ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "error" "$(( SECONDS - _start_ts ))" "source_add_failed"
-    json_error "source_add_failed" "source add response missing source id" "$source_output"
-    return 1
-  fi
-
-  note_verify_output=$(retry_cli "note-get-verify" notebooklm note get -n "$nb_id" "$note_id" 2>&1)
-  note_verify_exit=$?
-  if [[ $note_verify_exit -ne 0 ]]; then
-    audit_log "$agent_id" "$notebook" "note-convert-to-source" "warning" "$(( SECONDS - _start_ts ))" "note_verify_failed"
-  else
-    note_verify_json=$(parse_note_get_output "$note_verify_output")
-    if [[ -z "$note_verify_json" ]]; then
-      audit_log "$agent_id" "$notebook" "note-convert-to-source" "warning" "$(( SECONDS - _start_ts ))" "note_verify_parse_failed"
-    else
-      note_verify_content=$(echo "$note_verify_json" | jq -r '.content // ""')
-      if [[ "$note_verify_content" != "$note_content" ]]; then
-        audit_log "$agent_id" "$notebook" "note-convert-to-source" "warning" "$(( SECONDS - _start_ts ))" "note_changed_after_convert"
-      fi
-    fi
-  fi
-
-  cache_invalidate "source_list" "$notebook" >/dev/null 2>&1
-
-  audit_log "$agent_id" "$notebook" "note-convert-to-source" "ok" "$(( SECONDS - _start_ts ))"
-  jq -n -c     --arg nb "$notebook"     --arg nid "$note_id"     --arg sid "$source_id"     --arg nt "$note_title"     --argjson note "$note_json"     --argjson source "$source_output"     '{ok:true,action:"note_converted_to_source",notebook:$nb,note_id:$nid,source_id:$sid,note_title:$nt,data:{note:$note,source:$source}}'
+  printf '%s\n' "$output" | jq -c '{ok:true,cached:false,data:.}'
   return 0
 }
 
@@ -904,15 +676,11 @@ usage() {
   "usage": "nlm-gateway.sh <command> [options]",
   "commands": {
     "query":     "--agent <id> --notebook <name> --query <text> [--no-cache]",
-    "note":      "--agent <id> --subcmd <convert-to-source> --notebook <name> --note-id <id>",
     "source":    "--agent <id> --subcmd <add|list|remove> --notebook <name> [--path <path>] [--source-id <id>] [--no-cache]",
     "artifact":  "--agent <id> --subcmd <generate|download> --notebook <name> [args...]",
     "research":  "--agent <id> --notebook <name> --query <text>",
     "notebooks": "--agent <id> --subcmd <list|get|add|remove> [--name <n>] [--id <id>] [--desc <d>]",
     "health":    "--agent <id>"
-  },
-  "notes": {
-    "note_convert": "Fetches note content via 'note get' then adds it back as a text source via 'source add'"
   }
 }
 USAGE
@@ -929,7 +697,7 @@ main() {
 
   # Parse common flags
   local agent_id="" notebook="" query="" subcmd="" no_cache="false"
-  local source_path="" source_id="" note_id="" nb_name="" nb_id="" nb_desc=""
+  local source_path="" source_id="" nb_name="" nb_id="" nb_desc=""
   local extra_args=()
 
   while [[ $# -gt 0 ]]; do
@@ -941,7 +709,6 @@ main() {
       --no-cache)  no_cache="true"; shift ;;
       --path)      source_path="$2"; shift 2 ;;
       --source-id) source_id="$2"; shift 2 ;;
-      --note-id)   note_id="$2"; shift 2 ;;
       --name)      nb_name="$2"; shift 2 ;;
       --id)        nb_id="$2"; shift 2 ;;
       --desc)      nb_desc="$2"; shift 2 ;;
@@ -961,9 +728,6 @@ main() {
   case "$command" in
     query)
       cmd_query "$agent_id" "$notebook" "$query" "$no_cache"
-      ;;
-    note)
-      cmd_note "$agent_id" "${subcmd:-}" "$notebook" "$note_id"
       ;;
     source)
       case "$subcmd" in

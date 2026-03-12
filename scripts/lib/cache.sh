@@ -44,7 +44,7 @@ cache_get() {
     jq -n -c '{"ok":false,"hit":false,"reason":"corrupt_cache"}'
     return 1
   fi
-  jq -n -c --argjson age "$file_age" --argjson d "$data" '{"ok":true,"hit":true,"age":$age,"data":$d}'
+  printf '%s\n' "$data" | jq -c --argjson age "$file_age" '{ok:true,hit:true,age:$age,data:.}'
   return 0
 }
 

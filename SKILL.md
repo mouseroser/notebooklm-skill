@@ -2,6 +2,12 @@
 
 Interact with Google NotebookLM via the `notebooklm` CLI through a managed gateway with ACL, caching, rate limiting, and content filtering.
 
+## Usage Boundary
+
+- `openclaw-docs` is reserved for OpenClaw-specific issues only, such as configuration, fault diagnosis, architecture, and commands.
+- For all other NotebookLM usage, operate against NotebookLM directly or use the appropriate non-`openclaw-docs` notebook instead of routing through `openclaw-docs` by default.
+- If a notebook is deleted and recreated, update `config/notebooks.json` immediately before further queries.
+
 ## Description
 
 Multi-agent gateway for NotebookLM operations: query notebooks, manage sources, generate artifacts, and run research — all with per-agent access control and structured JSON output.
@@ -31,6 +37,18 @@ nlm-gateway.sh query --agent main --notebook memory --query "What is the current
   }
 }
 ```
+
+### Note management
+```bash
+# Convert a note into a text source
+nlm-gateway.sh note --agent <agent_id> --subcmd convert-to-source --notebook <name> --note-id <note_id>
+```
+
+This gateway command keeps the governance checks from `source add`: ACL, rate limiting, notebook registry lookup, a single lock across both CLI calls, cache invalidation, and audit logging. It first runs `notebooklm note get`, then re-ingests the note body with `notebooklm source add --title ...`.
+
+**Success response highlights:** `action`, `source_id`, `note_title`, and `data.note` / `data.source` for both step outputs.
+
+**Common errors:** `invalid_args`, `note_not_found`, `source_add_failed`, `acl_denied`, `notebook_not_found`.
 
 ### Source management
 ```bash
@@ -114,7 +132,7 @@ vim ~/.openclaw/skills/notebooklm/config/settings.json
 
 ### 3. Login to NotebookLM
 ```bash
-# Ensure Surge enhanced mode is on with US node
+# Ensure Surge enhanced mode is on with a supported node (Taiwan or US; not Hong Kong)
 notebooklm login
 ```
 

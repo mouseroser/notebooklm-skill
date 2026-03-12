@@ -3,47 +3,138 @@
     "main": {
       "role": "admin",
       "notebooks": "*",
-      "operations": ["query", "source-add", "source-remove", "source-list", "artifact-generate", "artifact-download", "research", "notebook-create", "notebook-delete", "registry-edit", "health-check"]
+      "operations": [
+        "query",
+        "source-add",
+        "note-convert-to-source",
+        "source-remove",
+        "source-list",
+        "artifact-generate",
+        "artifact-download",
+        "research",
+        "notebook-create",
+        "notebook-delete",
+        "registry-edit",
+        "health-check"
+      ]
     },
     "wemedia": {
       "role": "contributor",
-      "notebooks": ["media-research", "memory"],
-      "operations": ["query", "source-add", "source-list", "artifact-generate", "artifact-download", "research"]
+      "notebooks": [
+        "media-research",
+        "memory"
+      ],
+      "operations": [
+        "query",
+        "source-add",
+        "note-convert-to-source",
+        "source-list",
+        "artifact-generate",
+        "artifact-download",
+        "research"
+      ]
     },
     "gemini": {
       "role": "contributor",
-      "notebooks": ["memory", "media-research", "openclaw-docs"],
-      "operations": ["query", "source-add", "source-list", "research"]
+      "notebooks": [
+        "memory",
+        "media-research",
+        "openclaw-docs"
+      ],
+      "operations": [
+        "query",
+        "source-add",
+        "note-convert-to-source",
+        "source-list",
+        "research"
+      ]
     },
     "brainstorming": {
       "role": "contributor",
-      "notebooks": ["memory", "media-research", "openclaw-docs"],
-      "operations": ["query", "source-add", "source-list", "research"]
+      "notebooks": [
+        "memory",
+        "media-research",
+        "openclaw-docs"
+      ],
+      "operations": [
+        "query",
+        "source-add",
+        "note-convert-to-source",
+        "source-list",
+        "research"
+      ]
     },
     "coding": {
       "role": "reader",
-      "notebooks": ["openclaw-docs", "memory"],
-      "operations": ["query", "source-list"]
+      "notebooks": [
+        "openclaw-docs",
+        "memory"
+      ],
+      "operations": [
+        "query",
+        "source-list"
+      ]
     },
     "review": {
       "role": "reader",
-      "notebooks": ["openclaw-docs", "memory"],
-      "operations": ["query", "source-list"]
+      "notebooks": [
+        "openclaw-docs",
+        "memory"
+      ],
+      "operations": [
+        "query",
+        "source-list"
+      ]
     },
     "test": {
       "role": "reader",
-      "notebooks": ["openclaw-docs", "memory"],
-      "operations": ["query", "source-list"]
+      "notebooks": [
+        "openclaw-docs",
+        "memory"
+      ],
+      "operations": [
+        "query",
+        "source-list"
+      ]
     },
     "docs": {
       "role": "reader",
-      "notebooks": ["openclaw-docs", "memory"],
-      "operations": ["query", "source-list"]
+      "notebooks": [
+        "openclaw-docs",
+        "memory"
+      ],
+      "operations": [
+        "query",
+        "source-list"
+      ]
     },
     "monitor-bot": {
       "role": "monitor",
       "notebooks": "*",
-      "operations": ["health-check", "query"]
+      "operations": [
+        "health-check",
+        "query"
+      ]
+    },
+    "notebooklm": {
+      "role": "contributor",
+      "notebooks": [
+        "openclaw-docs",
+        "memory",
+        "media-research",
+        "stareval-research",
+        "starchain-knowledge"
+      ],
+      "operations": [
+        "query",
+        "source-add",
+        "note-convert-to-source",
+        "source-list",
+        "artifact-generate",
+        "artifact-download",
+        "research",
+        "health-check"
+      ]
     },
     "_default": {
       "role": "none",

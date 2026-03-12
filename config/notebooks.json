@@ -1,19 +1,39 @@
 {
   "notebooks": {
     "memory": {
-      "id": "426445ec-1a7f-4700-a7e7-4ffd0fa91a97",
+      "id": "a8e0fa9b-8194-45fb-abb2-0c4af40ecaba",
       "description": "Agent shared memory and context",
       "added": "2026-02-28T16:19:38Z"
     },
+    "memory-archive": {
+      "id": "bb3121a4-5e95-4d32-8d9a-a85cf1e363af",
+      "description": "Memory Archive with rolling window (4 weeks)",
+      "added": "2026-03-10T20:00:00Z"
+    },
     "media-research": {
-      "id": "636b77c6-3549-48e7-9b64-9d5c07afe554",
+      "id": "cfb2b01d-396d-4ac2-ac8a-b86501713e47",
       "description": "Wemedia content research sources",
       "added": "2026-02-28T16:19:38Z"
     },
     "openclaw-docs": {
-      "id": "87221f2c-09d8-4c5c-8378-86a93a225e1e",
+      "id": "98473fd7-a7c1-4557-bf3d-15a5e37b17cd",
       "description": "OpenClaw documentation and architecture",
       "added": "2026-02-28T16:19:38Z"
+    },
+    "troubleshooting": {
+      "id": "300907c0-16e7-47f8-b6f6-cce6677738fe",
+      "description": "Troubleshooting Knowledge Base - Structured from all memory files",
+      "added": "2026-03-09T12:00:00Z"
+    },
+    "stareval-research": {
+      "id": "998ab871-27c7-4127-9491-e3d824e10e27",
+      "description": "StarEval research and evaluation knowledge base",
+      "added": "2026-03-10T21:06:00Z"
+    },
+    "starchain-knowledge": {
+      "id": "23878e01-0798-4dd9-911d-765384c27b09",
+      "description": "StarChain development knowledge, historical implementation patterns, templates, and delivery references",
+      "added": "2026-03-10T21:35:00Z"
     }
   }
 }
