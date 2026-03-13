@@ -1,12 +1,12 @@
 {
   "notebooks": {
     "memory": {
-      "id": "a8e0fa9b-8194-45fb-abb2-0c4af40ecaba",
+      "id": "74a08007-d0a9-4cad-905d-14b9116f7765",
       "description": "Agent shared memory and context",
-      "added": "2026-02-28T16:19:38Z"
+      "added": "2026-03-13T09:14:18Z"
     },
     "memory-archive": {
-      "id": "bb3121a4-5e95-4d32-8d9a-a85cf1e363af",
+      "id": "94f8f2c3-55a7-4f51-94eb-df65cc835b53",
       "description": "Memory Archive with rolling window (4 weeks)",
       "added": "2026-03-10T20:00:00Z"
     },
